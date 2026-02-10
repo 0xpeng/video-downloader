@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Download Test</title>
+  <style>
+    body { font-family: system-ui; padding: 40px; background: #1a1a2e; color: white; }
+    button { padding: 15px 30px; font-size: 18px; cursor: pointer; margin: 10px; }
+    #log { background: #0a0a15; padding: 20px; margin-top: 20px; white-space: pre-wrap; font-family: monospace; max-height: 400px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>Download Test Page</h1>
+  <p>This page tests different download methods directly.</p>
+
+  <div>
+    <button onclick="testDownload('iframe')">Test: iframe</button>
+    <button onclick="testDownload('anchor')">Test: anchor.click()</button>
+    <button onclick="testDownload('location')">Test: window.location</button>
+    <button onclick="testDownload('open')">Test: window.open</button>
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    function log(msg) {
+      const time = new Date().toISOString().substr(11, 12);
+      logEl.textContent += `[${time}] ${msg}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(msg);
+    }
+
+    async function testDownload(method) {
+      log(`\n=== Testing ${method} ===`);
+
+      try {
+        // Step 1: Get tunnel URL from our API
+        log('Step 1: Calling /api/download...');
+        const response = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            audioOnly: false
+          }),
+        });
+
+        const data = await response.json();
+        log(`Response: status=${data.status}, filename=${data.filename}`);
+
+        if (!data.url) {
+          log('ERROR: No URL returned');
+          return;
+        }
+
+        // Step 2: Build proxy URL
+        const filename = data.filename || 'video.mp4';
+        const proxyUrl = `/api/proxy?url=${encodeURIComponent(data.url)}&filename=${encodeURIComponent(filename)}`;
+        log(`Proxy URL length: ${proxyUrl.length}`);
+
+        // Step 3: Trigger download based on method
+        log(`Triggering download with ${method}...`);
+
+        switch (method) {
+          case 'iframe':
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = proxyUrl;
+            document.body.appendChild(iframe);
+            log('iframe created and added to DOM');
+            break;
+
+          case 'anchor':
+            const a = document.createElement('a');
+            a.href = proxyUrl;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            log('anchor clicked');
+            break;
+
+          case 'location':
+            window.location.href = proxyUrl;
+            log('location set');
+            break;
+
+          case 'open':
+            window.open(proxyUrl, '_blank');
+            log('window opened');
+            break;
+        }
+
+        log('Download triggered - check Downloads folder');
+
+      } catch (err) {
+        log(`ERROR: ${err.message}`);
+      }
+    }
+  </script>
+</body>
+</html>

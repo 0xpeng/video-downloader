@@ -1,0 +1,25 @@
+services:
+  # Video Downloader Web App
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - COBALT_API_URL=http://cobalt-api:9000
+    depends_on:
+      - cobalt-api
+    restart: unless-stopped
+
+  # Self-hosted Cobalt API
+  cobalt-api:
+    image: ghcr.io/imputnet/cobalt:latest
+    ports:
+      - "9000:9000"
+    environment:
+      - API_PORT=9000
+      - API_URL=http://localhost:9000
+      # Uncomment for YouTube cookies (age-restricted videos)
+      # - COOKIE_PATH=/cookies/youtube.txt
+    # volumes:
+    #   - ./cookies:/cookies:ro
+    restart: unless-stopped
