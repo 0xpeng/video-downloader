@@ -11,9 +11,10 @@ function log(...args: unknown[]) {
   console.log(LOG_PREFIX, new Date().toISOString(), ...args);
 }
 
-// Add deno to PATH
+// Add homebrew and deno to PATH
+const HOMEBREW_PATH = '/opt/homebrew/bin';
 const DENO_PATH = path.join(os.homedir(), '.deno', 'bin');
-const ENV_PATH = `${DENO_PATH}:${process.env.PATH}`;
+const ENV_PATH = `${HOMEBREW_PATH}:${DENO_PATH}:${process.env.PATH}`;
 
 // Download video using yt-dlp to a temp file
 async function downloadToTemp(url: string, audioOnly: boolean): Promise<{ filepath: string; error?: string }> {
@@ -31,10 +32,12 @@ async function downloadToTemp(url: string, audioOnly: boolean): Promise<{ filepa
       args.push('-f', 'bestaudio');
       args.push('-x', '--audio-format', 'mp3');
     } else {
-      // 優先選擇 H.264 (avc1) 編碼，QuickTime Player 才能播放
-      // 如果沒有 H.264，才用 VP9
-      args.push('-f', 'bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best');
+      // 選擇最佳畫質，然後強制轉碼為 H.264 確保 Mac 相容性
+      args.push('-f', 'bestvideo+bestaudio/best');
       args.push('--merge-output-format', 'mp4');
+      // 強制轉碼為 H.264 + AAC，確保所有裝置都能播放
+      args.push('--recode-video', 'mp4');
+      args.push('--postprocessor-args', 'ffmpeg:-c:v libx264 -preset fast -crf 23 -c:a aac -b:a 192k');
     }
 
     args.push('-o', tempFile);

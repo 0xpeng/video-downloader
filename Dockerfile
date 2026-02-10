@@ -21,6 +21,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# 安裝 yt-dlp 和 ffmpeg（用於影片下載和轉碼）
+RUN apk add --no-cache python3 py3-pip ffmpeg \
+    && pip3 install --break-system-packages yt-dlp
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 

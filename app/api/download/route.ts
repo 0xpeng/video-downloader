@@ -3,9 +3,10 @@ import { spawn } from 'child_process';
 import path from 'path';
 import os from 'os';
 
-// Add deno to PATH
+// Add homebrew and deno to PATH
+const HOMEBREW_PATH = '/opt/homebrew/bin';
 const DENO_PATH = path.join(os.homedir(), '.deno', 'bin');
-const ENV_PATH = `${DENO_PATH}:${process.env.PATH}`;
+const ENV_PATH = `${HOMEBREW_PATH}:${DENO_PATH}:${process.env.PATH}`;
 
 function cleanUrl(url: string): string {
   try {
