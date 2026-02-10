@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# macOS app bundles (contain hardcoded paths)
+*.app/
+
+# logs
+server.log
