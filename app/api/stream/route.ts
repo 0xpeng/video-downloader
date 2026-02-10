@@ -4,6 +4,7 @@ import { createReadStream, unlinkSync, statSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import { randomUUID } from 'crypto';
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit';
 
 const LOG_PREFIX = '[STREAM]';
 
@@ -103,6 +104,20 @@ async function downloadToTemp(url: string, audioOnly: boolean): Promise<{ filepa
 }
 
 export async function GET(request: NextRequest) {
+  // 速率限制檢查
+  const clientIP = getClientIP(request);
+  const rateLimit = checkRateLimit(clientIP);
+
+  if (!rateLimit.allowed) {
+    return new Response(JSON.stringify({ error: '請求過於頻繁，請稍後再試' }), {
+      status: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': Math.ceil(rateLimit.resetIn / 1000).toString(),
+      },
+    });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const url = searchParams.get('url');
   const filename = searchParams.get('filename') || 'video.mp4';

@@ -6,6 +6,65 @@ function log(...args: unknown[]) {
   console.log(LOG_PREFIX, new Date().toISOString(), ...args);
 }
 
+// 允許的域名白名單（只允許已知的影片 CDN）
+const ALLOWED_DOMAINS = [
+  // TikTok CDN
+  'tiktokcdn.com',
+  'tiktokcdn-us.com',
+  'musical.ly',
+  // YouTube CDN
+  'googlevideo.com',
+  'ytimg.com',
+  // Twitter/X CDN
+  'twimg.com',
+  'video.twimg.com',
+  // Instagram CDN
+  'cdninstagram.com',
+  'fbcdn.net',
+  // Bilibili CDN
+  'bilivideo.com',
+  'hdslb.com',
+];
+
+function isAllowedUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    const hostname = url.hostname.toLowerCase();
+
+    // 檢查是否為允許的域名
+    return ALLOWED_DOMAINS.some(domain =>
+      hostname === domain || hostname.endsWith('.' + domain)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isPrivateIP(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    const hostname = url.hostname.toLowerCase();
+
+    // 阻擋私有 IP 和本地地址
+    const privatePatterns = [
+      /^localhost$/i,
+      /^127\./,
+      /^10\./,
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+      /^192\.168\./,
+      /^169\.254\./,  // AWS metadata
+      /^0\./,
+      /^\[::1\]$/,    // IPv6 localhost
+      /^\[fc/i,       // IPv6 private
+      /^\[fd/i,       // IPv6 private
+    ];
+
+    return privatePatterns.some(pattern => pattern.test(hostname));
+  } catch {
+    return true; // 如果解析失敗，視為不安全
+  }
+}
+
 // Map file extensions to MIME types
 function getMimeType(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase();
@@ -36,6 +95,24 @@ export async function GET(request: NextRequest) {
     log('ERROR: Missing URL');
     return new Response(JSON.stringify({ error: 'Missing URL' }), {
       status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // 安全檢查：阻擋私有 IP
+  if (isPrivateIP(url)) {
+    log('ERROR: Private IP blocked', url.substring(0, 50));
+    return new Response(JSON.stringify({ error: 'Access denied' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // 安全檢查：只允許白名單域名
+  if (!isAllowedUrl(url)) {
+    log('ERROR: Domain not in whitelist', url.substring(0, 50));
+    return new Response(JSON.stringify({ error: 'Domain not allowed' }), {
+      status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
   }

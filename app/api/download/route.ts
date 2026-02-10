@@ -2,11 +2,47 @@ import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import path from 'path';
 import os from 'os';
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit';
 
 // Add homebrew and deno to PATH
 const HOMEBREW_PATH = '/opt/homebrew/bin';
 const DENO_PATH = path.join(os.homedir(), '.deno', 'bin');
 const ENV_PATH = `${HOMEBREW_PATH}:${DENO_PATH}:${process.env.PATH}`;
+
+// 允許的影片平台白名單
+const ALLOWED_PLATFORMS = [
+  // YouTube
+  'youtube.com', 'youtu.be', 'www.youtube.com', 'm.youtube.com',
+  // TikTok
+  'tiktok.com', 'www.tiktok.com', 'vm.tiktok.com',
+  // Twitter/X
+  'twitter.com', 'x.com', 'www.twitter.com', 'www.x.com',
+  // Instagram
+  'instagram.com', 'www.instagram.com',
+  // Facebook
+  'facebook.com', 'www.facebook.com', 'fb.watch',
+  // Bilibili
+  'bilibili.com', 'www.bilibili.com', 'b23.tv',
+  // Vimeo
+  'vimeo.com', 'www.vimeo.com',
+  // Twitch
+  'twitch.tv', 'www.twitch.tv', 'clips.twitch.tv',
+  // 小紅書
+  'xiaohongshu.com', 'www.xiaohongshu.com', 'xhslink.com',
+];
+
+function isAllowedPlatform(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    const hostname = url.hostname.toLowerCase();
+
+    return ALLOWED_PLATFORMS.some(domain =>
+      hostname === domain || hostname.endsWith('.' + domain)
+    );
+  } catch {
+    return false;
+  }
+}
 
 function cleanUrl(url: string): string {
   try {
@@ -86,6 +122,23 @@ async function getVideoInfo(url: string): Promise<{ title: string; ext: string; 
 }
 
 export async function POST(request: NextRequest) {
+  // 速率限制檢查
+  const clientIP = getClientIP(request);
+  const rateLimit = checkRateLimit(clientIP);
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: '請求過於頻繁，請稍後再試' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil(rateLimit.resetIn / 1000).toString(),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { url, audioOnly } = body;
@@ -93,6 +146,14 @@ export async function POST(request: NextRequest) {
     if (!url) {
       return NextResponse.json(
         { error: '請提供影片網址' },
+        { status: 400 }
+      );
+    }
+
+    // 安全檢查：只允許白名單平台
+    if (!isAllowedPlatform(url)) {
+      return NextResponse.json(
+        { error: '不支援此平台，請使用 YouTube、TikTok、Twitter 等支援的平台' },
         { status: 400 }
       );
     }
